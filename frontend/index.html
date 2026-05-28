@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AI Software Compiler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Software Compiler & Dynamic Runtime</title>
   <link rel="stylesheet" href="style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Outfit:wght@700&family=Fira+Code&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body class="dark-mode">
   <header class="app-header">
@@ -36,9 +39,12 @@
     <!-- LEFT PANEL: COMPILER AND SCHEMAS -->
     <section class="panel-left">
       <div class="card compiler-input-card">
-        <div class="card-header"><h2>Compiler Input</h2><span class="badge">NL Prompt</span></div>
+        <div class="card-header">
+          <h2>Compiler Input</h2>
+          <span class="badge">NL Prompt</span>
+        </div>
         <div class="card-body">
-          <textarea id="prompt-input" placeholder="E.g., Build a CRM with contacts..."></textarea>
+          <textarea id="prompt-input" placeholder="E.g., Build a CRM with login, contacts, dashboard, role-based access, and premium plan with payments. Admins can see analytics."></textarea>
           <button id="compile-btn" class="btn btn-primary">
             <span class="btn-text">Compile App</span>
             <span class="spinner" style="display: none;"></span>
@@ -57,7 +63,7 @@
         </div>
         <div class="card-body">
           <div id="logs-container" class="logs-container">
-            <div class="log-placeholder">Enter a prompt above and click Compile to start...</div>
+            <div class="log-placeholder">Enter a prompt above and click Compile to start the multi-stage pipeline...</div>
           </div>
         </div>
       </div>
@@ -76,7 +82,9 @@
           </div>
         </div>
         <div class="card-body schema-body">
-          <pre id="schema-pre"><code class="language-json">{}</code></pre>
+          <pre id="schema-pre"><code class="language-json">{
+  "info": "Compile an application to see the generated execution schema blueprints."
+}</code></pre>
         </div>
       </div>
 
@@ -87,16 +95,37 @@
           <button id="run-eval-btn" class="btn btn-secondary">Run Eval Suite</button>
         </div>
         <div class="card-body">
-          <p class="eval-desc">Runs the pipeline over 20 pre-configured prompts.</p>
+          <p class="eval-desc">Runs the pipeline over 20 pre-configured prompts (10 products, 10 edge cases) to test deterministic schema compliance, self-repair mechanisms, and latency.</p>
           <div id="eval-results-container" style="display: none;">
             <div class="eval-grid">
-              <div class="eval-stat-card"><span class="eval-stat-label">Success Rate</span><span id="eval-success-rate" class="eval-stat-value">--</span></div>
-              <div class="eval-stat-card"><span class="eval-stat-label">Avg Latency</span><span id="eval-avg-latency" class="eval-stat-value">--</span></div>
-              <div class="eval-stat-card"><span class="eval-stat-label">Avg Repair Retries</span><span id="eval-avg-retries" class="eval-stat-value">--</span></div>
+              <div class="eval-stat-card">
+                <span class="eval-stat-label">Success Rate</span>
+                <span id="eval-success-rate" class="eval-stat-value">--</span>
+              </div>
+              <div class="eval-stat-card">
+                <span class="eval-stat-label">Avg Latency</span>
+                <span id="eval-avg-latency" class="eval-stat-value">--</span>
+              </div>
+              <div class="eval-stat-card">
+                <span class="eval-stat-label">Avg Repair Retries</span>
+                <span id="eval-avg-retries" class="eval-stat-value">--</span>
+              </div>
+              <div class="eval-stat-card">
+                <span class="eval-stat-label">Total Prompts</span>
+                <span id="eval-total-prompts" class="eval-stat-value">20</span>
+              </div>
             </div>
             <div class="table-wrapper eval-table-wrapper">
               <table id="eval-table">
-                <thead><tr><th>Prompt ID</th><th>Type</th><th>Status</th><th>Repair Retries</th><th>Latency</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Prompt ID</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Repair Retries</th>
+                    <th>Latency</th>
+                  </tr>
+                </thead>
                 <tbody id="eval-table-body"></tbody>
               </table>
             </div>
@@ -111,12 +140,17 @@
         <div class="simulator-top-bar">
           <div class="sim-title">
             <span class="sim-dot green"></span>
+            <span class="sim-dot yellow"></span>
+            <span class="sim-dot red"></span>
             <span class="sim-label">RUN-TIME APP PREVIEW</span>
           </div>
+          <!-- SIMULATOR CONTROL CONSOLE -->
           <div class="sim-controls">
             <div class="control-item">
               <label for="sim-role-select">Active Role:</label>
-              <select id="sim-role-select"><option value="Guest">Guest</option></select>
+              <select id="sim-role-select">
+                <option value="Guest">Guest</option>
+              </select>
             </div>
             <div class="control-item">
               <label for="sim-premium-checkbox">Premium Plan:</label>
@@ -125,15 +159,26 @@
           </div>
         </div>
 
-        <div class="simulator-canvas" id="app-canvas"></div>
+        <!-- RUNTIME EMBED CANVAS -->
+        <div class="simulator-canvas" id="app-canvas">
+          <div class="runtime-welcome">
+            <div class="welcome-icon">🎨</div>
+            <h3>Dynamic App Runtime Engine</h3>
+            <p>Your generated configuration schemas execute directly inside this viewport.</p>
+            <p class="hint">Write an instruction, hit "Compile App", and interact with your creation live.</p>
+          </div>
+        </div>
 
+        <!-- MOCK DATABASE VISUALIZER -->
         <div class="mock-db-card">
           <div class="db-header" id="db-header-toggle">
             <h3>🗄️ In-Memory local Database Monitor</h3>
             <span class="toggle-icon">▲</span>
           </div>
           <div class="db-body" id="db-visualizer-body">
-            <div class="db-tables-grid" id="db-tables-container"></div>
+            <div class="db-tables-grid" id="db-tables-container">
+              <div class="db-placeholder">Database is empty. Records will display here once forms are submitted in the preview.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -148,7 +193,28 @@
         <button class="close-btn" id="close-checkout">&times;</button>
       </div>
       <div class="modal-body">
-        <button id="pay-confirm-btn" class="btn btn-primary btn-block">Confirm Mock Payment</button>
+        <p>You are upgrading to the <strong>Premium subscription tier</strong>. This payment integration is simulated directly in the runtime.</p>
+        <div class="billing-details">
+          <div class="bill-row"><span>Billing Cycle</span><strong>Monthly Plan</strong></div>
+          <div class="bill-row"><span>Plan Amount</span><strong>$19.00 / mo</strong></div>
+        </div>
+        <form id="checkout-form" onsubmit="return false;">
+          <div class="form-group">
+            <label>Card Number</label>
+            <input type="text" value="4242 4242 4242 4242" disabled>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Expiry Date</label>
+              <input type="text" value="12/29" disabled>
+            </div>
+            <div class="form-group">
+              <label>CVV</label>
+              <input type="text" value="123" disabled>
+            </div>
+          </div>
+          <button id="pay-confirm-btn" class="btn btn-primary btn-block">Confirm Mock Payment</button>
+        </form>
       </div>
     </div>
   </div>

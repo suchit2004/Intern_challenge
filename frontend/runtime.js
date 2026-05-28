@@ -1,50 +1,44 @@
+// Global State
 let compiledSchema = null;
 let activePage = "";
 let activeRole = "Guest";
 let isPremiumPaid = false;
 
-const MOCK_DATA_TEMPLATES = {
-  users: [{ id: 1, name: "Suchit Jundare", email: "suchit@bankverse.com", role: "Admin" }],
-  contacts: [{ id: 1, name: "John Doe", email: "john@example.com" }]
-};
-
-function initLocalDb(dbSchema) {
-  if (!dbSchema || !dbSchema.tables) return;
-  dbSchema.tables.forEach(table => {
-    const key = `mock_db_${table.name.toLowerCase()}`;
-    if (!localStorage.getItem(key)) {
-      const templateData = MOCK_DATA_TEMPLATES[table.name.toLowerCase()] || [];
-      localStorage.setItem(key, JSON.stringify(templateData));
-    }
-  });
-  syncDbVisualizer();
+// Mock database functions
+function getTableRecords(t) { return JSON.parse(localStorage.getItem(`mock_db_${t}`)) || []; }
+function saveTableRecords(t, r) { localStorage.setItem(`mock_db_${t}`, JSON.stringify(r)); syncDbVisualizer(); }
+function insertDbRecord(t, r) {
+  const recs = getTableRecords(t);
+  const nextId = recs.length > 0 ? Math.max(...recs.map(x => x.id || 0)) + 1 : 1;
+  const newRec = { id: nextId, ...r };
+  recs.push(newRec);
+  saveTableRecords(t, recs);
+  return newRec;
+}
+function deleteDbRecord(t, id) {
+  saveTableRecords(t, getTableRecords(t).filter(x => x.id !== parseInt(id)));
 }
 
-function getTableRecords(tableName) {
-  const key = `mock_db_${tableName.toLowerCase()}`;
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : [];
-}
+function executeMockApi(path, method, body = null) {
+  if (!compiledSchema || !compiledSchema.api_schema) return { success: false, error: "No API schema." };
+  const endpoint = compiledSchema.api_schema.endpoints.find(e => e.path === path && e.method === method);
+  if (!endpoint) return { success: false, error: "404 Route Not Found" };
 
-function saveTableRecords(tableName, records) {
-  const key = `mock_db_${tableName.toLowerCase()}`;
-  localStorage.setItem(key, JSON.stringify(records));
-  syncDbVisualizer();
-}
+  if (endpoint.authRequired && !endpoint.allowedRoles.includes(activeRole)) {
+    return { success: false, error: "403 Forbidden: Role unauthorized." };
+  }
 
-function insertDbRecord(tableName, record) {
-  const records = getTableRecords(tableName);
-  const nextId = records.length > 0 ? Math.max(...records.map(r => r.id || 0)) + 1 : 1;
-  const newRecord = { id: nextId, ...record };
-  records.push(newRecord);
-  saveTableRecords(tableName, records);
-  return newRecord;
-}
+  const action = endpoint.dbAction;
+  if (!action) return { success: true };
 
-function deleteDbRecord(tableName, recordId) {
-  let records = getTableRecords(tableName);
-  records = records.filter(r => r.id !== parseInt(recordId));
-  saveTableRecords(tableName, records);
+  const tableName = action.targetTable.toLowerCase();
+  if (action.type === 'select') return { success: true, data: getTableRecords(tableName) };
+  if (action.type === 'insert') return { success: true, data: insertDbRecord(tableName, body) };
+  if (action.type === 'delete') {
+    deleteDbRecord(tableName, body.id);
+    return { success: true };
+  }
+  return { success: false };
 }
 
 function syncDbVisualizer() {}

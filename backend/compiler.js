@@ -1,64 +1,95 @@
 const { callLLM } = require('./llmClient');
 
 async function runStage1(prompt, clientConfig) {
-  const systemPrompt = `You are the first stage (Intent Extractor) of a software generation compiler. Return intent JSON.`;
-  const userPrompt = `Build an application based on these requirements: "	ext${prompt}"`;
-  const resultText = await callLLM({ ...clientConfig, systemPrompt, userPrompt, jsonMode: true });
+  const systemPrompt = `You are the first stage (Intent Extractor) of a software generation compiler. Return JSON.`;
+  const resultText = await callLLM({ ...clientConfig, systemPrompt, userPrompt: prompt, jsonMode: true });
   return JSON.parse(resultText.trim());
 }
 
 async function runStage2(intentData, clientConfig) {
-  const systemPrompt = `You are the second stage (System Design Layer) of a software compiler.
-Your task is to take a structured intent specification and convert it into a detailed system design blueprint.
-You will specify:
-1. Database layout
-2. REST API endpoints needed
-3. UI page layouts and buttons/actions
-4. Role permissions mapping
+  const systemPrompt = `You are the second stage (System Design Layer) of a software compiler. Return JSON.`;
+  const resultText = await callLLM({ ...clientConfig, systemPrompt, userPrompt: JSON.stringify(intentData), jsonMode: true });
+  return JSON.parse(resultText.trim());
+}
 
-Output a VALID JSON object containing:
+async function runStage3(designBlueprint, clientConfig) {
+  const systemPrompt = `You are the third stage (Schema Generator) of a software compiler.
+Generate a VALID JSON object with this exact structure:
 {
-  "databaseBlueprint": {
+  "db_schema": {
     "tables": [
       {
-        "name": "TableName",
-        "columns": [{"name": "colName", "type": "string|integer|boolean", "isPrimaryKey": true/false, "foreignKey": "OtherTable.id (optional)"}]
+        "name": "table_name_lowercase",
+        "columns": [
+          { "name": "col_name", "type": "string|number|boolean", "primary": true/false, "nullable": true/false, "references": "table_name.col_name" (optional) }
+        ]
       }
     ]
   },
-  "apiBlueprint": {
+  "api_schema": {
     "endpoints": [
       {
         "path": "/api/...",
         "method": "GET|POST|PUT|DELETE",
-        "description": "what it does",
-        "requiredRole": "Admin|Member|Guest|All",
-        "dbOperation": "Reads TableName | Writes TableName"
+        "description": "...",
+        "authRequired": true/false,
+        "allowedRoles": ["Admin", "Member"],
+        "requestBody": [
+          { "name": "field_name", "type": "string|number|boolean", "required": true/false }
+        ],
+        "dbAction": {
+          "type": "insert|select|update|delete",
+          "targetTable": "table_name_lowercase",
+          "queryConditions": [{"field": "col_name", "operator": "equals", "valueFrom": "body.field_name|auth.userId"}]
+        }
       }
     ]
   },
-  "uiBlueprint": {
+  "ui_schema": {
     "pages": [
       {
-        "name": "PageName",
-        "layout": "dashboard|table|form|checkout",
-        "components": [
+        "name": "Dashboard|Contacts|checkout|etc",
+        "icon": "home|users|chart|credit-card|settings",
+        "layout": "grid|sidebar|standalone",
+        "rolesAllowed": ["Admin", "Member", "Guest"],
+        "widgets": [
           {
-            "id": "comp_id",
-            "type": "table|form|chart|button",
-            "title": "Title",
-            "action": "Navigates to PageName | Submits to /api/... (if button/form)"
+            "id": "w_1",
+            "type": "metric|table|form|chart|payment_button",
+            "title": "Widget Title",
+            "targetTable": "table_name_lowercase",
+            "dataSourceApi": "/api/...",
+            "submitApi": "/api/...",
+            "formFields": [
+              { "name": "field_name", "label": "Label Text", "type": "text|number|email", "required": true }
+            ]
           }
         ]
       }
     ]
+  },
+  "auth_schema": {
+    "defaultRole": "Guest",
+    "roles": ["Admin", "Member", "Guest"],
+    "permissions": {
+      "pages": { "Dashboard": ["Admin", "Member"], "Contacts": ["Admin", "Member"], "checkout": ["Guest", "Member"] },
+      "apis": { "/api/contacts": ["Admin", "Member"] }
+    }
+  },
+  "business_rules": {
+    "premiumGating": {
+      "enabled": true/false,
+      "premiumRole": "PremiumUser",
+      "gatedPages": ["Analytics"],
+      "checkoutPage": "checkout"
+    }
   }
 }
-DO NOT include any explanation or markdown formatting outside the JSON.`;
+Return raw valid JSON.`;
 
-  const userPrompt = `Convert this Intent Specification into a System Design Blueprint: 	ext${JSON.stringify(intentData, null, 2)}`;
+  const userPrompt = `Expand this Blueprint into the executable configuration schemas: 	ext${JSON.stringify(designBlueprint, null, 2)}`;
   const resultText = await callLLM({ ...clientConfig, systemPrompt, userPrompt, jsonMode: true });
   return JSON.parse(resultText.trim());
 }
 
-module.exports = { runStage1, runStage2 };
+module.exports = { runStage1, runStage2, runStage3 };

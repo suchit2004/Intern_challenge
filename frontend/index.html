@@ -4,31 +4,155 @@
   <meta charset="UTF-8">
   <title>AI Software Compiler</title>
   <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Outfit:wght@700&family=Fira+Code&display=swap" rel="stylesheet">
 </head>
 <body class="dark-mode">
   <header class="app-header">
-    <div class="logo"><h1>BankVerse Compiler</h1></div>
+    <div class="logo">
+      <span class="logo-icon">⚙️</span>
+      <div class="logo-text">
+        <h1>BankVerse Compiler</h1>
+        <span class="tagline">Natural Language ➔ Executable Software</span>
+      </div>
+    </div>
+    <div class="header-settings">
+      <div class="settings-group">
+        <label for="provider-select">Provider:</label>
+        <select id="provider-select">
+          <option value="groq" selected>Groq (Llama-3.3)</option>
+          <option value="gemini">Gemini API (Flash)</option>
+          <option value="openai">OpenAI (GPT-4o)</option>
+          <option value="vertex">Vertex AI (GCP Service)</option>
+        </select>
+      </div>
+      <div class="settings-group">
+        <label for="api-key-input">API Key override:</label>
+        <input type="password" id="api-key-input" placeholder="Paste custom key to bypass server .env">
+      </div>
+    </div>
   </header>
 
   <main class="dashboard-container">
+    <!-- LEFT PANEL: COMPILER AND SCHEMAS -->
     <section class="panel-left">
-      <textarea id="prompt-input"></textarea>
-      <button id="compile-btn">Compile App</button>
-      <div id="logs-container"></div>
-      <pre id="schema-pre"><code></code></pre>
+      <div class="card compiler-input-card">
+        <div class="card-header"><h2>Compiler Input</h2><span class="badge">NL Prompt</span></div>
+        <div class="card-body">
+          <textarea id="prompt-input" placeholder="E.g., Build a CRM with contacts..."></textarea>
+          <button id="compile-btn" class="btn btn-primary">
+            <span class="btn-text">Compile App</span>
+            <span class="spinner" style="display: none;"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- PROGRESS TRACKER -->
+      <div class="card logs-card">
+        <div class="card-header">
+          <h2>Compilation Progress logs</h2>
+          <div class="stats-indicators">
+            <span id="stat-latency" class="stat-indicator">Latency: --s</span>
+            <span id="stat-retries" class="stat-indicator">Repair Retries: 0</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="logs-container" class="logs-container">
+            <div class="log-placeholder">Enter a prompt above and click Compile to start...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCHEMA VIEWER -->
+      <div class="card schema-card">
+        <div class="card-header">
+          <h2>Compiled Executable Schemas</h2>
+          <div class="tab-buttons">
+            <button class="tab-btn active" data-tab="db">DB</button>
+            <button class="tab-btn" data-tab="api">API</button>
+            <button class="tab-btn" data-tab="ui">UI</button>
+            <button class="tab-btn" data-tab="auth">Auth</button>
+            <button class="tab-btn" data-tab="logic">Logic</button>
+            <button class="tab-btn" data-tab="full">Full JSON</button>
+          </div>
+        </div>
+        <div class="card-body schema-body">
+          <pre id="schema-pre"><code class="language-json">{}</code></pre>
+        </div>
+      </div>
+
+      <!-- EVALUATION CARD -->
+      <div class="card evaluation-card">
+        <div class="card-header">
+          <h2>Evaluation & Stress Tests</h2>
+          <button id="run-eval-btn" class="btn btn-secondary">Run Eval Suite</button>
+        </div>
+        <div class="card-body">
+          <p class="eval-desc">Runs the pipeline over 20 pre-configured prompts.</p>
+          <div id="eval-results-container" style="display: none;">
+            <div class="eval-grid">
+              <div class="eval-stat-card"><span class="eval-stat-label">Success Rate</span><span id="eval-success-rate" class="eval-stat-value">--</span></div>
+              <div class="eval-stat-card"><span class="eval-stat-label">Avg Latency</span><span id="eval-avg-latency" class="eval-stat-value">--</span></div>
+              <div class="eval-stat-card"><span class="eval-stat-label">Avg Repair Retries</span><span id="eval-avg-retries" class="eval-stat-value">--</span></div>
+            </div>
+            <div class="table-wrapper eval-table-wrapper">
+              <table id="eval-table">
+                <thead><tr><th>Prompt ID</th><th>Type</th><th>Status</th><th>Repair Retries</th><th>Latency</th></tr></thead>
+                <tbody id="eval-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
+    <!-- RIGHT PANEL: INTERACTIVE APPLICATION RUNTIME -->
     <section class="panel-right">
       <div class="runtime-simulator-card">
         <div class="simulator-top-bar">
-          <span class="sim-label">RUN-TIME APP PREVIEW</span>
-          <select id="sim-role-select"><option value="Guest">Guest</option></select>
-          <input type="checkbox" id="sim-premium-checkbox">
+          <div class="sim-title">
+            <span class="sim-dot green"></span>
+            <span class="sim-label">RUN-TIME APP PREVIEW</span>
+          </div>
+          <div class="sim-controls">
+            <div class="control-item">
+              <label for="sim-role-select">Active Role:</label>
+              <select id="sim-role-select"><option value="Guest">Guest</option></select>
+            </div>
+            <div class="control-item">
+              <label for="sim-premium-checkbox">Premium Plan:</label>
+              <input type="checkbox" id="sim-premium-checkbox">
+            </div>
+          </div>
         </div>
+
         <div class="simulator-canvas" id="app-canvas"></div>
+
+        <div class="mock-db-card">
+          <div class="db-header" id="db-header-toggle">
+            <h3>🗄️ In-Memory local Database Monitor</h3>
+            <span class="toggle-icon">▲</span>
+          </div>
+          <div class="db-body" id="db-visualizer-body">
+            <div class="db-tables-grid" id="db-tables-container"></div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
+
+  <!-- MOCK BILLING MODAL -->
+  <div class="modal" id="checkout-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>💳 Mock Payment Checkout Gateway</h3>
+        <button class="close-btn" id="close-checkout">&times;</button>
+      </div>
+      <div class="modal-body">
+        <button id="pay-confirm-btn" class="btn btn-primary btn-block">Confirm Mock Payment</button>
+      </div>
+    </div>
+  </div>
+
   <script src="runtime.js"></script>
 </body>
 </html>

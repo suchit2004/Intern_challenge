@@ -1,44 +1,53 @@
-// Global State
+// Global state variables
 let compiledSchema = null;
 let activePage = "";
 let activeRole = "Guest";
 let isPremiumPaid = false;
 
-// Mock database functions
-function getTableRecords(t) { return JSON.parse(localStorage.getItem(`mock_db_${t}`)) || []; }
-function saveTableRecords(t, r) { localStorage.setItem(`mock_db_${t}`, JSON.stringify(r)); syncDbVisualizer(); }
-function insertDbRecord(t, r) {
-  const recs = getTableRecords(t);
-  const nextId = recs.length > 0 ? Math.max(...recs.map(x => x.id || 0)) + 1 : 1;
-  const newRec = { id: nextId, ...r };
-  recs.push(newRec);
-  saveTableRecords(t, recs);
-  return newRec;
-}
-function deleteDbRecord(t, id) {
-  saveTableRecords(t, getTableRecords(t).filter(x => x.id !== parseInt(id)));
-}
+function renderApp(schema) {
+  const canvas = document.getElementById('app-canvas');
+  canvas.innerHTML = "";
+  const sidebarPages = schema.ui_schema.pages || [];
+  if (sidebarPages.length === 0) return;
 
-function executeMockApi(path, method, body = null) {
-  if (!compiledSchema || !compiledSchema.api_schema) return { success: false, error: "No API schema." };
-  const endpoint = compiledSchema.api_schema.endpoints.find(e => e.path === path && e.method === method);
-  if (!endpoint) return { success: false, error: "404 Route Not Found" };
+  const appContainer = document.createElement('div');
+  appContainer.className = 'live-app-container';
+  const sidebar = document.createElement('aside');
+  sidebar.className = 'live-app-sidebar';
+  sidebar.innerHTML = `<div class="sidebar-title">${schema.projectName}</div><ul class="nav-list" id="sim-nav-list"></ul>`;
+  appContainer.appendChild(sidebar);
 
-  if (endpoint.authRequired && !endpoint.allowedRoles.includes(activeRole)) {
-    return { success: false, error: "403 Forbidden: Role unauthorized." };
-  }
+  const contentArea = document.createElement('div');
+  contentArea.className = 'live-app-content';
+  contentArea.innerHTML = `
+    <header class="live-app-header">
+      <h3 id="sim-page-title">Page</h3>
+      <div id="sim-user-status">Role: ${activeRole}</div>
+    </header>
+    <div class="live-app-body" id="sim-page-body"></div>`;
+  appContainer.appendChild(contentArea);
+  canvas.appendChild(appContainer);
 
-  const action = endpoint.dbAction;
-  if (!action) return { success: true };
-
-  const tableName = action.targetTable.toLowerCase();
-  if (action.type === 'select') return { success: true, data: getTableRecords(tableName) };
-  if (action.type === 'insert') return { success: true, data: insertDbRecord(tableName, body) };
-  if (action.type === 'delete') {
-    deleteDbRecord(tableName, body.id);
-    return { success: true };
-  }
-  return { success: false };
+  rebuildSidebarNav();
+  switchPage(sidebarPages[0].name);
 }
 
-function syncDbVisualizer() {}
+function rebuildSidebarNav() {
+  const navList = document.getElementById('sim-nav-list');
+  if (!navList || !compiledSchema) return;
+  navList.innerHTML = "";
+  compiledSchema.ui_schema.pages.forEach(page => {
+    if (!page.rolesAllowed.includes(activeRole)) return;
+    const li = document.createElement('li');
+    li.innerHTML = `<button class="nav-item-btn" onclick="switchPage('${page.name}')">${page.name}</button>`;
+    navList.appendChild(li);
+  });
+}
+
+function switchPage(name) {
+  activePage = name;
+  document.getElementById('sim-page-title').innerText = name;
+  renderPageContent(name);
+}
+
+function renderPageContent(name) {}

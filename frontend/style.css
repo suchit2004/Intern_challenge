@@ -1,0 +1,22 @@
+:root {
+  --bg-primary: #0b0f17;
+  --bg-secondary: rgba(20, 26, 38, 0.65);
+  --bg-card: rgba(26, 33, 48, 0.7);
+  --bg-input: #121824;
+  --color-text-main: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-accent: #6366f1;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--color-text-main);
+  min-height: 100vh;
+}

@@ -2,37 +2,69 @@ const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
 
-// Global fetch wrapper with automated retries on HTTP 429 (Rate Limit) errors
+// Global fetch wrapper with automated retries on HTTP 429 (Rate Limit), transient errors (5xx), and network timeouts
 async function fetchWithRetry(url, options, maxRetries = 6) {
   let attempt = 0;
   while (attempt < maxRetries) {
     attempt++;
-    const res = await fetch(url, options);
     
-    if (res.status === 429) {
-      const errText = await res.clone().text();
-      let waitMs = 2000 * Math.pow(1.5, attempt - 1); // Exponential backoff fallback
+    // Set up a 25-second request timeout using AbortController
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    
+    const requestOptions = {
+      ...options,
+      signal: controller.signal
+    };
+    
+    try {
+      const res = await fetch(url, requestOptions);
+      clearTimeout(timeoutId); // Request completed, clear timer
       
-      try {
-        const errObj = JSON.parse(errText);
-        const msg = errObj.error?.message || errObj.error || "";
-        const match = msg.match(/try again in ([\d\.]+)s/i) || msg.match(/try again in ([\d\.]+)ms/i);
-        if (match) {
-          const num = parseFloat(match[1]);
-          const isMs = msg.toLowerCase().includes('ms');
-          waitMs = isMs ? num : num * 1000;
+      if (res.status === 429 || res.status === 503 || res.status === 502 || res.status === 504 || res.status === 500) {
+        const errText = await res.clone().text();
+        let waitMs = 2000 * Math.pow(1.5, attempt - 1); // Exponential backoff fallback
+        
+        if (res.status === 429) {
+          try {
+            const errObj = JSON.parse(errText);
+            const msg = errObj.error?.message || errObj.error || "";
+            const match = msg.match(/try again in ([\d\.]+)s/i) || msg.match(/try again in ([\d\.]+)ms/i);
+            if (match) {
+              const num = parseFloat(match[1]);
+              const isMs = msg.toLowerCase().includes('ms');
+              waitMs = isMs ? num : num * 1000;
+            }
+          } catch (e) {
+            // ignore
+          }
+        } else {
+          // Shorter delay for transient server-side errors
+          waitMs = 1500 * attempt;
         }
-      } catch (e) {
-        // ignore
+        
+        waitMs += 1000; // safety buffer
+        console.warn(`⚠️ [HTTP Error ${res.status}] (Attempt ${attempt}/${maxRetries}): Waiting for ${(waitMs / 1000).toFixed(2)}s before retrying request...`);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        continue; // retry
       }
       
-      waitMs += 1000; // 1-second safety buffer
-      console.warn(`⚠️ [Rate Limit 429] (Attempt ${attempt}/${maxRetries}): Waiting for ${(waitMs / 1000).toFixed(2)}s before retrying request...`);
-      await new Promise(resolve => setTimeout(resolve, waitMs));
-      continue; // retry
+      return res;
+      
+    } catch (err) {
+      clearTimeout(timeoutId); // Request failed, clear timer
+      
+      // Exponential delay for network errors
+      const waitMs = 2000 * attempt + 1000;
+      console.warn(`⚠️ [Network Error: ${err.name === 'AbortError' ? 'Request Timed Out' : err.message}] (Attempt ${attempt}/${maxRetries}): Waiting for ${(waitMs / 1000).toFixed(2)}s before retrying request...`);
+      
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+        continue; // retry
+      } else {
+        throw err; // Re-throw if all attempts exhausted
+      }
     }
-    
-    return res;
   }
   
   // Final fallback attempt
@@ -178,7 +210,7 @@ async function callLLM({ provider, apiKey, model, systemPrompt, userPrompt, json
   if (resolvedProvider === 'gemini') {
     const key = (apiKey || process.env.GEMINI_API_KEY || '').trim();
     if (!key) throw new Error("Gemini API Key not found. Please set GEMINI_API_KEY.");
-    const selectedModel = model || 'gemini-1.5-flash';
+    const selectedModel = model || 'gemini-2.5-flash';
 
     const body = {
       contents: [

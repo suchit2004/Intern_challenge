@@ -11,15 +11,14 @@ function validateSchema(schema) {
 
   const tables = new Set((schema.db_schema.tables || []).map(t => t.name.toLowerCase()));
   const apiOnlyPaths = new Set((schema.api_schema.endpoints || []).map(e => e.path));
+  const authRoles = new Set(schema.auth_schema.roles || []);
 
-  // DB tables validation
   const dbTables = schema.db_schema.tables || [];
   dbTables.forEach(table => {
     const primaryKeys = (table.columns || []).filter(c => c.primary);
     if (primaryKeys.length === 0) errors.push(`Table '	ext${table.name}' has no primary key.`);
   });
 
-  // API endpoints validation
   const endpoints = schema.api_schema.endpoints || [];
   endpoints.forEach(endpoint => {
     if (endpoint.dbAction) {
@@ -28,25 +27,36 @@ function validateSchema(schema) {
     }
   });
 
-  // UI bindings validation
   const pages = schema.ui_schema.pages || [];
   pages.forEach(page => {
+    (page.rolesAllowed || []).forEach(role => {
+      if (!authRoles.has(role)) errors.push(`Page '	ext${page.name}' references undefined role '	ext${role}'.`);
+    });
     const widgets = page.widgets || [];
     widgets.forEach(widget => {
-      if (widget.targetTable) {
-        const tTable = widget.targetTable.toLowerCase();
-        if (!tables.has(tTable)) {
-          errors.push(`Widget '	ext${widget.title}' on '	ext${page.name}' targets missing table '	ext${tTable}'.`);
-        }
-      }
-      if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) {
-        errors.push(`Widget '	ext${widget.title}' on '	ext${page.name}' binds to missing API '	ext${widget.dataSourceApi}'.`);
-      }
-      if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) {
-        errors.push(`Widget '	ext${widget.title}' on '	ext${page.name}' binds to missing API '	ext${widget.submitApi}'.`);
-      }
+      if (widget.targetTable && !tables.has(widget.targetTable.toLowerCase())) errors.push(`Widget targets missing table '	ext${widget.targetTable}'.`);
+      if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) errors.push(`Widget binds to missing API '	ext${widget.dataSourceApi}'.`);
+      if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) errors.push(`Widget binds to missing API '	ext${widget.submitApi}'.`);
     });
   });
+
+  // Auth vs API matching checks
+  const permissions = schema.auth_schema.permissions || {};
+  if (permissions.apis) {
+    Object.keys(permissions.apis).forEach(apiPath => {
+      if (!apiOnlyPaths.has(apiPath)) {
+        errors.push(`Auth permissions reference undefined API route: '	ext${apiPath}'.`);
+      }
+    });
+  }
+
+  // Premium gating check
+  const pg = schema.business_rules?.premiumGating;
+  if (pg && pg.enabled) {
+    if (pg.premiumRole && !authRoles.has(pg.premiumRole)) {
+      errors.push(`Premium Gating references non-existent role '	ext${pg.premiumRole}'.`);
+    }
+  }
 
   return { valid: errors.length === 0, errors };
 }

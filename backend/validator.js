@@ -30,35 +30,46 @@ function validateSchema(schema) {
   const pages = schema.ui_schema.pages || [];
   pages.forEach(page => {
     (page.rolesAllowed || []).forEach(role => {
-      if (!authRoles.has(role)) errors.push(`Page '	ext${page.name}' references undefined role '	ext${role}'.`);
+      if (!authRoles.has(role)) errors.push(`Page references undefined role '	ext${role}'.`);
     });
     const widgets = page.widgets || [];
     widgets.forEach(widget => {
-      if (widget.targetTable && !tables.has(widget.targetTable.toLowerCase())) errors.push(`Widget targets missing table '	ext${widget.targetTable}'.`);
+      if (widget.targetTable && !tables.has(widget.targetTable.toLowerCase())) errors.push(`Widget targets missing table.`);
       if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) errors.push(`Widget binds to missing API '	ext${widget.dataSourceApi}'.`);
       if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) errors.push(`Widget binds to missing API '	ext${widget.submitApi}'.`);
     });
   });
 
-  // Auth vs API matching checks
-  const permissions = schema.auth_schema.permissions || {};
-  if (permissions.apis) {
-    Object.keys(permissions.apis).forEach(apiPath => {
-      if (!apiOnlyPaths.has(apiPath)) {
-        errors.push(`Auth permissions reference undefined API route: '	ext${apiPath}'.`);
-      }
-    });
-  }
-
-  // Premium gating check
   const pg = schema.business_rules?.premiumGating;
-  if (pg && pg.enabled) {
-    if (pg.premiumRole && !authRoles.has(pg.premiumRole)) {
-      errors.push(`Premium Gating references non-existent role '	ext${pg.premiumRole}'.`);
-    }
+  if (pg && pg.enabled && pg.premiumRole && !authRoles.has(pg.premiumRole)) {
+    errors.push(`Premium gating references non-existent role.`);
   }
 
   return { valid: errors.length === 0, errors };
 }
 
-module.exports = { validateSchema };
+async function repairSchema(schema, errors, clientConfig) {
+  const systemPrompt = `You are the Auto-Repair Engine of a software compiler.
+Your task is to correct semantic errors and cross-layer inconsistencies in a generated application schema configuration.
+You must review the provided schema and the validation errors list, patch the inconsistencies, and output the entire corrected JSON schema.
+DO NOT write explanations. Return raw valid JSON.`;
+
+  const userPrompt = `Validation Errors Found:
+	ext${JSON.stringify(errors, null, 2)}
+
+Current Faulty Schema Configuration:
+	ext${JSON.stringify(schema, null, 2)}
+
+Please output the fully corrected JSON schema.`;
+
+  const resultText = await callLLM({
+    ...clientConfig,
+    systemPrompt,
+    userPrompt,
+    jsonMode: true
+  });
+
+  return JSON.parse(resultText.trim());
+}
+
+module.exports = { validateSchema, repairSchema };

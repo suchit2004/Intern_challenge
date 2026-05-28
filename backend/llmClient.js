@@ -2,6 +2,43 @@ const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
 
+// Global fetch wrapper with automated retries on HTTP 429 (Rate Limit) errors
+async function fetchWithRetry(url, options, maxRetries = 6) {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    attempt++;
+    const res = await fetch(url, options);
+    
+    if (res.status === 429) {
+      const errText = await res.clone().text();
+      let waitMs = 2000 * Math.pow(1.5, attempt - 1); // Exponential backoff fallback
+      
+      try {
+        const errObj = JSON.parse(errText);
+        const msg = errObj.error?.message || errObj.error || "";
+        const match = msg.match(/try again in ([\d\.]+)s/i) || msg.match(/try again in ([\d\.]+)ms/i);
+        if (match) {
+          const num = parseFloat(match[1]);
+          const isMs = msg.toLowerCase().includes('ms');
+          waitMs = isMs ? num : num * 1000;
+        }
+      } catch (e) {
+        // ignore
+      }
+      
+      waitMs += 1000; // 1-second safety buffer
+      console.warn(`⚠️ [Rate Limit 429] (Attempt ${attempt}/${maxRetries}): Waiting for ${(waitMs / 1000).toFixed(2)}s before retrying request...`);
+      await new Promise(resolve => setTimeout(resolve, waitMs));
+      continue; // retry
+    }
+    
+    return res;
+  }
+  
+  // Final fallback attempt
+  return fetch(url, options);
+}
+
 // Helper to encode a string to base64url (required for JWT creation)
 function base64url(str) {
   return Buffer.from(str)
@@ -35,7 +72,7 @@ async function getVertexAccessToken(creds) {
 
   const jwt = `${signatureInput}.${signature}`;
 
-  const response = await fetch('https://oauth2.googleapis.com/token', {
+  const response = await fetchWithRetry('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -84,7 +121,7 @@ async function callLLM({ provider, apiKey, model, systemPrompt, userPrompt, json
       body.response_format = { type: 'json_object' };
     }
 
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetchWithRetry('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -120,7 +157,7 @@ async function callLLM({ provider, apiKey, model, systemPrompt, userPrompt, json
       body.response_format = { type: 'json_object' };
     }
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetchWithRetry('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -162,7 +199,7 @@ async function callLLM({ provider, apiKey, model, systemPrompt, userPrompt, json
     }
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${key}`;
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -210,7 +247,7 @@ async function callLLM({ provider, apiKey, model, systemPrompt, userPrompt, json
       body.generationConfig.responseMimeType = 'application/json';
     }
 
-    const res = await fetch(url, {
+    const res = await fetchWithRetry(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,

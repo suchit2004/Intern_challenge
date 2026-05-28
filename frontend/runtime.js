@@ -1,34 +1,19 @@
-// Render widgets functions
-function renderMetricWidget(widget, container) {
+function renderFormWidget(widget, container) {
   const card = document.createElement('div');
-  card.className = 'widget-metric';
-  let val = getTableRecords(widget.targetTable).length;
-  card.innerHTML = `
-    <div class="metric-info">
-      <h4>${widget.title}</h4>
-      <div class="metric-value">${val}</div>
-    </div>`;
-  container.appendChild(card);
-}
-
-function renderTableWidget(widget, container) {
-  const card = document.createElement('div');
-  card.className = 'widget-table';
-  const records = getTableRecords(widget.targetTable);
+  card.className = 'widget-form';
   card.innerHTML = `<h4>${widget.title}</h4>`;
-  
-  if (records.length === 0) {
-    card.innerHTML += "<p>No data</p>";
-    container.appendChild(card);
-    return;
-  }
-  const table = document.createElement('table');
-  const headers = Object.keys(records[0]);
-  let headerHtml = "<tr>" + headers.map(h => `<th>${h}</th>`).join('') + "</tr>";
-  table.innerHTML += headerHtml;
-  records.forEach(row => {
-    table.innerHTML += "<tr>" + headers.map(h => `<td>${row[h]}</td>`).join('') + "</tr>";
+  const form = document.createElement('form');
+  widget.formFields.forEach(field => {
+    form.innerHTML += `
+      <div class="form-group">
+        <label>${field.label}</label>
+        <input type="text" name="${field.name}">
+      </div>`;
   });
-  card.appendChild(table);
+  const btn = document.createElement('button');
+  btn.type = 'submit';
+  btn.innerText = "Submit";
+  form.appendChild(btn);
+  card.appendChild(form);
   container.appendChild(card);
 }

@@ -12,21 +12,20 @@
 
   <main class="dashboard-container">
     <section class="panel-left">
-      <div class="card compiler-input-card">
-        <textarea id="prompt-input"></textarea>
-        <button id="compile-btn">Compile App</button>
-      </div>
-      <div class="card logs-card"><div id="logs-container"></div></div>
+      <textarea id="prompt-input"></textarea>
+      <button id="compile-btn">Compile App</button>
+      <div id="logs-container"></div>
+      <pre id="schema-pre"><code></code></pre>
+    </section>
 
-      <div class="card schema-card">
-        <div class="tab-buttons">
-          <button class="tab-btn active" data-tab="db">DB</button>
-          <button class="tab-btn" data-tab="api">API</button>
-          <button class="tab-btn" data-tab="ui">UI</button>
-          <button class="tab-btn" data-tab="auth">Auth</button>
-          <button class="tab-btn" data-tab="full">Full</button>
+    <section class="panel-right">
+      <div class="runtime-simulator-card">
+        <div class="simulator-top-bar">
+          <span class="sim-label">RUN-TIME APP PREVIEW</span>
+          <select id="sim-role-select"><option value="Guest">Guest</option></select>
+          <input type="checkbox" id="sim-premium-checkbox">
         </div>
-        <pre id="schema-pre"><code class="language-json">{}</code></pre>
+        <div class="simulator-canvas" id="app-canvas"></div>
       </div>
     </section>
   </main>

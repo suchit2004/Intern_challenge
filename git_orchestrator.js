@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 const workspaceDir = "C:\\Users\\Suchit  Jundare\\OneDrive\\Desktop\\Intern_challenge";
 
@@ -10,15 +10,19 @@ function writeFile(relative, content) {
   fs.writeFileSync(full, content, 'utf8');
 }
 
-function runGit(command) {
-  try {
-    const out = execSync(command, { cwd: workspaceDir, stdio: 'pipe' });
-    return out.toString();
-  } catch (err) {
-    console.error(`Error running git: ${command}`);
-    console.error(err.stderr ? err.stderr.toString() : err.message);
-    throw err; // Stop on first error
+function runGit(args) {
+  const result = spawnSync('git', args, { cwd: workspaceDir });
+  if (result.status !== 0) {
+    const err = result.stderr ? result.stderr.toString() : '';
+    // If it's just "nothing to commit", we can skip throwing an error
+    if (err.includes('nothing to commit') || result.stdout.toString().includes('nothing to commit')) {
+      return result.stdout.toString();
+    }
+    console.error(`Error running git: git ${args.join(' ')}`);
+    console.error(err || result.error.message);
+    throw new Error(err || result.error.message);
   }
+  return result.stdout ? result.stdout.toString() : '';
 }
 
 const commits = [
@@ -421,7 +425,7 @@ You must output a VALID JSON object containing:
 }
 DO NOT include any explanation or markdown formatting outside the JSON. Return raw valid JSON.\`;
 
-  const userPrompt = \`Build an application based on these requirements: "\${prompt}"\`;
+  const userPrompt = \`Build an application based on these requirements: "\text\${prompt}"\`;
   const resultText = await callLLM({ ...clientConfig, systemPrompt, userPrompt, jsonMode: true });
   return JSON.parse(resultText.trim());
 }
@@ -436,7 +440,7 @@ module.exports = { runStage1 };`
 
 async function runStage1(prompt, clientConfig) {
   const systemPrompt = \`You are the first stage (Intent Extractor) of a software generation compiler. Return intent JSON.\`;
-  const userPrompt = \`Build an application based on these requirements: "\${prompt}"\`;
+  const userPrompt = \`Build an application based on these requirements: "\text\${prompt}"\`;
   const resultText = await callLLM({ ...clientConfig, systemPrompt, userPrompt, jsonMode: true });
   return JSON.parse(resultText.trim());
 }
@@ -490,7 +494,7 @@ Output a VALID JSON object containing:
 }
 DO NOT include any explanation or markdown formatting outside the JSON.\`;
 
-  const userPrompt = \`Convert this Intent Specification into a System Design Blueprint: \${JSON.stringify(intentData, null, 2)}\`;
+  const userPrompt = \`Convert this Intent Specification into a System Design Blueprint: \text\${JSON.stringify(intentData, null, 2)}\`;
   const resultText = await callLLM({ ...clientConfig, systemPrompt, userPrompt, jsonMode: true });
   return JSON.parse(resultText.trim());
 }
@@ -590,7 +594,7 @@ Generate a VALID JSON object with this exact structure:
 }
 Return raw valid JSON.\`;
 
-  const userPrompt = \`Expand this Blueprint into the executable configuration schemas: \${JSON.stringify(designBlueprint, null, 2)}\`;
+  const userPrompt = \`Expand this Blueprint into the executable configuration schemas: \text\${JSON.stringify(designBlueprint, null, 2)}\`;
   const resultText = await callLLM({ ...clientConfig, systemPrompt, userPrompt, jsonMode: true });
   return JSON.parse(resultText.trim());
 }
@@ -672,10 +676,10 @@ async function compileApp(userPrompt, clientConfig, onProgress) {
       while (retries < maxRetries) {
         retries++;
         stats.repairRetries = retries;
-        log('Stage 4: Refinement Layer', \`Repair Cycle \${retries}/\${maxRetries}...\`);
+        log('Stage 4: Refinement Layer', \`Repair Cycle \text\${retries}/3...\`);
         try {
           const repaired = await repairSchema(currentSchema, errors, clientConfig);
-          log('Stage 4: Refinement Layer', \`Repair Cycle \${retries} output received. Running re-validation...\`);
+          log('Stage 4: Refinement Layer', \`Repair Cycle \text\${retries} output received. Running re-validation...\`);
           const reCheck = validateSchema(repaired);
           if (reCheck.valid) {
             log('Stage 4: Refinement Layer', \`Auto-Repair SUCCESSFUL. Resolved inconsistencies.\`);
@@ -686,13 +690,13 @@ async function compileApp(userPrompt, clientConfig, onProgress) {
             errors = reCheck.errors;
           }
         } catch (repairErr) {
-          log('Stage 4: Refinement Layer', \`Error: \${repairErr.message}\`);
+          log('Stage 4: Refinement Layer', \`Error: \text\${repairErr.message}\`);
         }
       }
       if (!finalSchema) finalSchema = rawSchema;
     }
   } catch (error) {
-    log('Pipeline Error', \`Failed at stage: \${error.message}\`);
+    log('Pipeline Error', \`Failed at stage: \text\${error.message}\`);
     throw error;
   }
 
@@ -716,7 +720,7 @@ function validateSchema(schema) {
 
   const layers = ['db_schema', 'api_schema', 'ui_schema', 'auth_schema', 'business_rules'];
   for (const layer of layers) {
-    if (!schema[layer]) errors.push(\`Missing layer: \${layer}\`);
+    if (!schema[layer]) errors.push(\`Missing layer: \text\${layer}\`);
   }
   return {
     valid: errors.length === 0,
@@ -737,7 +741,7 @@ function validateSchema(schema) {
   if (!schema) return { valid: false, errors: ["Schema is undefined."] };
   const layers = ['db_schema', 'api_schema', 'ui_schema', 'auth_schema', 'business_rules'];
   for (const layer of layers) {
-    if (!schema[layer]) errors.push(\`Missing layer: \${layer}\`);
+    if (!schema[layer]) errors.push(\`Missing layer: \text\${layer}\`);
   }
   if (errors.length > 0) return { valid: false, errors };
 
@@ -751,16 +755,16 @@ function validateSchema(schema) {
   dbTables.forEach(table => {
     const primaryKeys = (table.columns || []).filter(c => c.primary);
     if (primaryKeys.length === 0) {
-      errors.push(\`Table '\${table.name}' has no primary key.\`);
+      errors.push(\`Table '\text\${table.name}' has no primary key.\`);
     }
 
     (table.columns || []).forEach(col => {
       if (col.references) {
         const [refTable, refCol] = col.references.split('.');
         if (!refTable || !refCol) {
-          errors.push(\`Invalid foreign key format on '\${table.name}.\${col.name}': '\${col.references}'\`);
+          errors.push(\`Invalid foreign key format on '\text\${table.name}.\text\${col.name}': '\text\${col.references}'\`);
         } else if (!tables.has(refTable.toLowerCase())) {
-          errors.push(\`Table '\${table.name}.\${col.name}' references non-existent table '\${refTable}'.\`);
+          errors.push(\`Table '\text\${table.name}.\text\${col.name}' references non-existent table '\text\${refTable}'.\`);
         }
       }
     });
@@ -782,7 +786,7 @@ function validateSchema(schema) {
   if (!schema) return { valid: false, errors: ["Schema is undefined."] };
   const layers = ['db_schema', 'api_schema', 'ui_schema', 'auth_schema', 'business_rules'];
   for (const layer of layers) {
-    if (!schema[layer]) errors.push(\`Missing layer: \${layer}\`);
+    if (!schema[layer]) errors.push(\`Missing layer: \text\${layer}\`);
   }
   if (errors.length > 0) return { valid: false, errors };
 
@@ -790,12 +794,12 @@ function validateSchema(schema) {
   const dbTables = schema.db_schema.tables || [];
   dbTables.forEach(table => {
     const primaryKeys = (table.columns || []).filter(c => c.primary);
-    if (primaryKeys.length === 0) errors.push(\`Table '\${table.name}' has no primary key.\`);
+    if (primaryKeys.length === 0) errors.push(\`Table '\text\${table.name}' has no primary key.\`);
     (table.columns || []).forEach(col => {
       if (col.references) {
         const [refTable, refCol] = col.references.split('.');
-        if (!refTable || !refCol) errors.push(\`Invalid FK format: '\${col.references}'\`);
-        else if (!tables.has(refTable.toLowerCase())) errors.push(\`Table '\${table.name}.\${col.name}' references non-existent '\${refTable}'.\`);
+        if (!refTable || !refCol) errors.push(\`Invalid FK format: '\text\${col.references}'\`);
+        else if (!tables.has(refTable.toLowerCase())) errors.push(\`Table '\text\${table.name}.\text\${col.name}' references non-existent '\text\${refTable}'.\`);
       }
     });
   });
@@ -806,7 +810,7 @@ function validateSchema(schema) {
     if (endpoint.dbAction) {
       const targetTable = (endpoint.dbAction.targetTable || '').toLowerCase();
       if (targetTable && !tables.has(targetTable)) {
-        errors.push(\`API '\${endpoint.method} \${endpoint.path}' targets non-existent DB table '\${targetTable}'.\`);
+        errors.push(\`API '\text\${endpoint.method} \text\${endpoint.path}' targets non-existent DB table '\text\${targetTable}'.\`);
       }
     }
   });
@@ -827,7 +831,7 @@ function validateSchema(schema) {
   if (!schema) return { valid: false, errors: ["Schema is undefined."] };
   const layers = ['db_schema', 'api_schema', 'ui_schema', 'auth_schema', 'business_rules'];
   for (const layer of layers) {
-    if (!schema[layer]) errors.push(\`Missing layer: \${layer}\`);
+    if (!schema[layer]) errors.push(\`Missing layer: \text\${layer}\`);
   }
   if (errors.length > 0) return { valid: false, errors };
 
@@ -838,7 +842,7 @@ function validateSchema(schema) {
   const dbTables = schema.db_schema.tables || [];
   dbTables.forEach(table => {
     const primaryKeys = (table.columns || []).filter(c => c.primary);
-    if (primaryKeys.length === 0) errors.push(\`Table '\${table.name}' has no primary key.\`);
+    if (primaryKeys.length === 0) errors.push(\`Table '\text\${table.name}' has no primary key.\`);
   });
 
   // API endpoints validation
@@ -846,7 +850,7 @@ function validateSchema(schema) {
   endpoints.forEach(endpoint => {
     if (endpoint.dbAction) {
       const targetTable = (endpoint.dbAction.targetTable || '').toLowerCase();
-      if (targetTable && !tables.has(targetTable)) errors.push(\`API targets missing '\${targetTable}'.\`);
+      if (targetTable && !tables.has(targetTable)) errors.push(\`API targets missing '\text\${targetTable}'.\`);
     }
   });
 
@@ -858,14 +862,14 @@ function validateSchema(schema) {
       if (widget.targetTable) {
         const tTable = widget.targetTable.toLowerCase();
         if (!tables.has(tTable)) {
-          errors.push(\`Widget '\${widget.title}' on '\${page.name}' targets missing table '\${tTable}'.\`);
+          errors.push(\`Widget '\text\${widget.title}' on '\text\${page.name}' targets missing table '\text\${tTable}'.\`);
         }
       }
       if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) {
-        errors.push(\`Widget '\${widget.title}' on '\${page.name}' binds to missing API '\${widget.dataSourceApi}'.\`);
+        errors.push(\`Widget '\text\${widget.title}' on '\text\${page.name}' binds to missing API '\text\${widget.dataSourceApi}'.\`);
       }
       if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) {
-        errors.push(\`Widget '\${widget.title}' on '\${page.name}' binds to missing API '\${widget.submitApi}'.\`);
+        errors.push(\`Widget '\text\${widget.title}' on '\text\${page.name}' binds to missing API '\text\${widget.submitApi}'.\`);
       }
     });
   });
@@ -886,7 +890,7 @@ function validateSchema(schema) {
   if (!schema) return { valid: false, errors: ["Schema is undefined."] };
   const layers = ['db_schema', 'api_schema', 'ui_schema', 'auth_schema', 'business_rules'];
   for (const layer of layers) {
-    if (!schema[layer]) errors.push(\`Missing layer: \${layer}\`);
+    if (!schema[layer]) errors.push(\`Missing layer: \text\${layer}\`);
   }
   if (errors.length > 0) return { valid: false, errors };
 
@@ -897,27 +901,27 @@ function validateSchema(schema) {
   const dbTables = schema.db_schema.tables || [];
   dbTables.forEach(table => {
     const primaryKeys = (table.columns || []).filter(c => c.primary);
-    if (primaryKeys.length === 0) errors.push(\`Table '\${table.name}' has no primary key.\`);
+    if (primaryKeys.length === 0) errors.push(\`Table '\text\${table.name}' has no primary key.\`);
   });
 
   const endpoints = schema.api_schema.endpoints || [];
   endpoints.forEach(endpoint => {
     if (endpoint.dbAction) {
       const targetTable = (endpoint.dbAction.targetTable || '').toLowerCase();
-      if (targetTable && !tables.has(targetTable)) errors.push(\`API targets missing '\${targetTable}'.\`);
+      if (targetTable && !tables.has(targetTable)) errors.push(\`API targets missing '\text\${targetTable}'.\`);
     }
   });
 
   const pages = schema.ui_schema.pages || [];
   pages.forEach(page => {
     (page.rolesAllowed || []).forEach(role => {
-      if (!authRoles.has(role)) errors.push(\`Page '\${page.name}' references undefined role '\${role}'.\`);
+      if (!authRoles.has(role)) errors.push(\`Page '\text\${page.name}' references undefined role '\text\${role}'.\`);
     });
     const widgets = page.widgets || [];
     widgets.forEach(widget => {
-      if (widget.targetTable && !tables.has(widget.targetTable.toLowerCase())) errors.push(\`Widget targets missing table '\${widget.targetTable}'.\`);
-      if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) errors.push(\`Widget binds to missing API '\${widget.dataSourceApi}'.\`);
-      if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) errors.push(\`Widget binds to missing API '\${widget.submitApi}'.\`);
+      if (widget.targetTable && !tables.has(widget.targetTable.toLowerCase())) errors.push(\`Widget targets missing table '\text\${widget.targetTable}'.\`);
+      if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) errors.push(\`Widget binds to missing API '\text\${widget.dataSourceApi}'.\`);
+      if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) errors.push(\`Widget binds to missing API '\text\${widget.submitApi}'.\`);
     });
   });
 
@@ -926,7 +930,7 @@ function validateSchema(schema) {
   if (permissions.apis) {
     Object.keys(permissions.apis).forEach(apiPath => {
       if (!apiOnlyPaths.has(apiPath)) {
-        errors.push(\`Auth permissions reference undefined API route: '\${apiPath}'.\`);
+        errors.push(\`Auth permissions reference undefined API route: '\text\${apiPath}'.\`);
       }
     });
   }
@@ -935,7 +939,7 @@ function validateSchema(schema) {
   const pg = schema.business_rules?.premiumGating;
   if (pg && pg.enabled) {
     if (pg.premiumRole && !authRoles.has(pg.premiumRole)) {
-      errors.push(\`Premium Gating references non-existent role '\${pg.premiumRole}'.\`);
+      errors.push(\`Premium Gating references non-existent role '\text\${pg.premiumRole}'.\`);
     }
   }
 
@@ -955,7 +959,7 @@ function validateSchema(schema) {
   if (!schema) return { valid: false, errors: ["Schema is undefined."] };
   const layers = ['db_schema', 'api_schema', 'ui_schema', 'auth_schema', 'business_rules'];
   for (const layer of layers) {
-    if (!schema[layer]) errors.push(\`Missing layer: \${layer}\`);
+    if (!schema[layer]) errors.push(\`Missing layer: \text\${layer}\`);
   }
   if (errors.length > 0) return { valid: false, errors };
 
@@ -966,27 +970,27 @@ function validateSchema(schema) {
   const dbTables = schema.db_schema.tables || [];
   dbTables.forEach(table => {
     const primaryKeys = (table.columns || []).filter(c => c.primary);
-    if (primaryKeys.length === 0) errors.push(\`Table '\${table.name}' has no primary key.\`);
+    if (primaryKeys.length === 0) errors.push(\`Table '\text\${table.name}' has no primary key.\`);
   });
 
   const endpoints = schema.api_schema.endpoints || [];
   endpoints.forEach(endpoint => {
     if (endpoint.dbAction) {
       const targetTable = (endpoint.dbAction.targetTable || '').toLowerCase();
-      if (targetTable && !tables.has(targetTable)) errors.push(\`API targets missing '\${targetTable}'.\`);
+      if (targetTable && !tables.has(targetTable)) errors.push(\`API targets missing '\text\${targetTable}'.\`);
     }
   });
 
   const pages = schema.ui_schema.pages || [];
   pages.forEach(page => {
     (page.rolesAllowed || []).forEach(role => {
-      if (!authRoles.has(role)) errors.push(\`Page references undefined role '\${role}'.\`);
+      if (!authRoles.has(role)) errors.push(\`Page references undefined role '\text\${role}'.\`);
     });
     const widgets = page.widgets || [];
     widgets.forEach(widget => {
       if (widget.targetTable && !tables.has(widget.targetTable.toLowerCase())) errors.push(\`Widget targets missing table.\`);
-      if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) errors.push(\`Widget binds to missing API '\${widget.dataSourceApi}'.\`);
-      if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) errors.push(\`Widget binds to missing API '\${widget.submitApi}'.\`);
+      if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) errors.push(\`Widget binds to missing API '\text\${widget.dataSourceApi}'.\`);
+      if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) errors.push(\`Widget binds to missing API '\text\${widget.submitApi}'.\`);
     });
   });
 
@@ -1042,7 +1046,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 app.listen(PORT, () => {
-  console.log(\`Server listening on http://localhost:\${PORT}\`);
+  console.log(\`Server listening on http://localhost:\text\${PORT}\`);
 });`
     }
   },
@@ -1068,7 +1072,7 @@ app.post('/api/compile', async (req, res) => {
 
   try {
     const result = await compileApp(prompt, clientConfig, (logEntry) => {
-      console.log(\`[\${logEntry.stage}] \${logEntry.message}\`);
+      console.log(\`[\text\${logEntry.stage}] \text\${logEntry.message}\`);
     });
     return res.json(result);
   } catch (error) {
@@ -1077,7 +1081,7 @@ app.post('/api/compile', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(\`Server listening on http://localhost:\${PORT}\`);
+  console.log(\`Server listening on http://localhost:\text\${PORT}\`);
 });`
     }
   },
@@ -1102,7 +1106,7 @@ app.post('/api/compile', async (req, res) => {
   const clientConfig = { provider: provider || 'groq', apiKey, model };
   try {
     const result = await compileApp(prompt, clientConfig, (logEntry) => {
-      console.log(\`[\${logEntry.stage}] \${logEntry.message}\`);
+      console.log(\`[\text\${logEntry.stage}] \text\${logEntry.message}\`);
     });
     return res.json(result);
   } catch (error) {
@@ -1128,7 +1132,7 @@ app.post('/api/evaluate', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(\`Server running at http://localhost:\${PORT}\`);
+  console.log(\`Server running at http://localhost:\text\${PORT}\`);
 });`
     }
   },
@@ -1942,21 +1946,22 @@ function insertDbRecord(tableName, record) {
   return newRecord;
 }
 
-function deleteDbRecord(tableName, recordId) {
-  saveTableRecords(tableName, getTableRecords(tableName).filter(r => r.id !== parseInt(recordId)));
-}
-
+// REST simulator
 function executeMockApi(path, method, body = null) {
   if (!compiledSchema) return { success: false, error: "Schema not loaded." };
   const endpoint = compiledSchema.api_schema.endpoints.find(e => e.path === path && e.method === method);
   if (!endpoint) return { success: false, error: "404 Not Found" };
   if (endpoint.authRequired && !endpoint.allowedRoles.includes(activeRole)) return { success: false, error: "403 Forbidden" };
-  if (!endpoint.dbAction) return { success: true };
-  const t = endpoint.dbAction.targetTable.toLowerCase();
-  if (endpoint.dbAction.type === 'select') return { success: true, data: getTableRecords(t) };
-  if (endpoint.dbAction.type === 'insert') return { success: true, data: insertDbRecord(t, body) };
-  if (endpoint.dbAction.type === 'delete') { deleteDbRecord(t, body.id); return { success: true }; }
-  return { success: false };
+  const t = endpoint.dbAction ? endpoint.dbAction.targetTable.toLowerCase() : "";
+  if (endpoint.dbAction) {
+    if (endpoint.dbAction.type === 'select') return { success: true, data: getTableRecords(t) };
+    if (endpoint.dbAction.type === 'insert') return { success: true, data: insertDbRecord(t, body) };
+    if (endpoint.dbAction.type === 'delete') {
+      saveTableRecords(t, getTableRecords(t).filter(r => r.id !== parseInt(body.id)));
+      return { success: true };
+    }
+  }
+  return { success: true };
 }
 
 function renderApp(schema) {
@@ -1972,7 +1977,7 @@ function renderApp(schema) {
   appContainer.appendChild(sidebar);
   const content = document.createElement('div');
   content.className = 'live-app-content';
-  content.innerHTML = \`<header class="live-app-header"><h3 id="sim-page-title">Page</h3><div id="sim-user-status">Role: \${activeRole}</div></header><div class="live-app-body" id="sim-page-body"></div>\`;
+  content.innerHTML = \`<header class="live-app-header"><h3 id="sim-page-title">Page</h3><div id="sim-user-status">Role: \text\${activeRole}</div></header><div class="live-app-body" id="sim-page-body"></div>\`;
   appContainer.appendChild(content);
   canvas.appendChild(appContainer);
   rebuildSidebarNav();
@@ -1986,10 +1991,9 @@ function rebuildSidebarNav() {
   compiledSchema.ui_schema.pages.forEach(p => {
     if (!p.rolesAllowed.includes(activeRole)) return;
     const li = document.createElement('li');
-    li.innerHTML = \`<button class="nav-item-btn" onclick="switchPage('\${p.name}')">\${p.name}</button>\`;
+    li.innerHTML = \`<button class="nav-item-btn" onclick="switchPage('\text\${p.name}')">\text\${p.name}</button>\`;
     navList.appendChild(li);
   });
-  document.getElementById('sim-user-status').innerText = \`Role: \${activeRole}\`;
 }
 
 function switchPage(name) {
@@ -2009,7 +2013,7 @@ function renderPageContent(pageName) {
   }
   const pg = compiledSchema.business_rules?.premiumGating;
   if (pg && pg.enabled && pg.gatedPages.includes(pageName) && !isPremiumPaid) {
-    body.innerHTML = \`<h3>Premium Feature Locked</h3><button class="btn btn-primary" onclick="openCheckoutModal()">Upgrade ($19/mo)</button>\`;
+    body.innerHTML = \`<h3>Premium Feature Locked</h3><button class=\"btn btn-primary\" onclick=\"openCheckoutModal()\">Upgrade ($19/mo)</button>\`;
     return;
   }
   const grid = document.createElement('div');
@@ -2019,19 +2023,19 @@ function renderPageContent(pageName) {
     if (w.type === 'metric') {
       const card = document.createElement('div');
       card.className = 'widget-metric';
-      card.innerHTML = \`<h4>\${w.title}</h4><div class="metric-value">\text\${getTableRecords(w.targetTable).length}</div>\`;
+      card.innerHTML = \`<h4>\text\${w.title}</h4><div class=\"metric-value\">\text\${getTableRecords(w.targetTable).length}</div>\`;
       grid.appendChild(card);
     } else if (w.type === 'table') {
       const card = document.createElement('div');
       card.className = 'widget-table';
       const recs = getTableRecords(w.targetTable);
-      card.innerHTML = \`<h4>\${w.title}</h4>\`;
+      card.innerHTML = \`<h4>\text\${w.title}</h4>\`;
       if (recs.length > 0) {
         const tbl = document.createElement('table');
         const hd = Object.keys(recs[0]).filter(k => k !== 'id');
-        tbl.innerHTML = "<tr>" + hd.map(h => \`<th>\${h}</th>\`).join('') + "<th>Actions</th></tr>";
+        tbl.innerHTML = "<tr>" + hd.map(h => \`<th>\text\${h}</th>\`).join('') + "<th>Actions</th></tr>";
         recs.forEach(r => {
-          tbl.innerHTML += "<tr>" + hd.map(h => \`<td>\${r[h]}</td>\`).join('') + \`<td><button onclick="handleDeleteRow('\text\${w.targetTable}','\text\${r.id}')">Delete</button></td></tr>\`;
+          tbl.innerHTML += "<tr>" + hd.map(h => \`<td>\text\${r[h]}</td>\`).join('') + \`<td><button onclick=\"handleDeleteRow('\text\${w.targetTable}','\text\${r.id}')\">Delete</button></td></tr>\`;
         });
         card.appendChild(tbl);
       } else { card.innerHTML += "<p>No data</p>"; }
@@ -2039,10 +2043,10 @@ function renderPageContent(pageName) {
     } else if (w.type === 'form') {
       const card = document.createElement('div');
       card.className = 'widget-form';
-      card.innerHTML = \`<h4>\${w.title}</h4>\`;
+      card.innerHTML = \`<h4>\text\${w.title}</h4>\`;
       const form = document.createElement('form');
       w.formFields.forEach(f => {
-        form.innerHTML += \`<div class=\"form-group\"><label>\${f.label}</label><input type=\"text\" name=\"\${f.name}\"></div>\`;
+        form.innerHTML += \`<div class=\"form-group\"><label>\text\${f.label}</label><input type=\"text\" name=\"\text\${f.name}\"></div>\`;
       });
       const btn = document.createElement('button');
       btn.innerText = "Submit";
@@ -2061,7 +2065,7 @@ function renderPageContent(pageName) {
 }
 
 function handleDeleteRow(tableName, id) {
-  executeMockApi(\`/api/\${tableName.toLowerCase()}\`, 'DELETE', { id });
+  executeMockApi(\`/api/\text\${tableName.toLowerCase()}\`, 'DELETE', { id });
   renderPageContent(activePage);
 }
 
@@ -2073,7 +2077,7 @@ function syncDbVisualizer() {
     const recs = getTableRecords(t.name);
     const box = document.createElement('div');
     box.className = 'db-table-box';
-    box.innerHTML = \`<div class="db-table-title">\${t.name.toLowerCase()} (\${recs.length} records)</div>\`;
+    box.innerHTML = \`<div class=\"db-table-title\">\text\${t.name.toLowerCase()} (\text\${recs.length} records)</div>\`;
     container.appendChild(box);
   });
 }
@@ -2096,14 +2100,11 @@ document.getElementById('compile-btn').onclick = async () => {
   const prompt = document.getElementById('prompt-input').value;
   const provider = document.getElementById('provider-select').value;
   const apiKey = document.getElementById('api-key-input').value;
-
   const btn = document.getElementById('compile-btn');
   btn.disabled = true;
   btn.innerText = "Compiling...";
-
   const logs = document.getElementById('logs-container');
   logs.innerHTML = "";
-
   try {
     const res = await fetch('/api/compile', {
       method: 'POST',
@@ -2112,21 +2113,18 @@ document.getElementById('compile-btn').onclick = async () => {
     });
     const data = await res.json();
     data.logs.forEach(l => {
-      logs.innerHTML += \`<div>[\${l.stage}] \${l.message}</div>\`;
+      logs.innerHTML += \`<div>[\text\${l.stage}] \text\${l.message}</div>\`;
     });
-
     if (res.ok && data.success) {
       compiledSchema = data.schemas;
       document.querySelector('#schema-pre code').innerText = JSON.stringify(compiledSchema, null, 2);
-      
       const roleSelect = document.getElementById('sim-role-select');
       roleSelect.innerHTML = "";
       compiledSchema.auth_schema.roles.forEach(r => {
-        roleSelect.innerHTML += \`<option value="\text\${r}">\text\${r}</option>\`;
+        roleSelect.innerHTML += \`<option value=\"\text\${r}\">\text\${r}</option>\`;
       });
       activeRole = compiledSchema.auth_schema.defaultRole;
       roleSelect.value = activeRole;
-
       initLocalDb(compiledSchema.db_schema);
       renderApp(compiledSchema);
     }
@@ -2286,9 +2284,9 @@ function executeCommits() {
   });
 
   // Commit clean start state
-  runGit("git add .");
+  runGit(["add", "."]);
   try {
-    runGit("git commit -m 'chore: prepare clean workspace for compilation steps'");
+    runGit(["commit", "-m", "chore: prepare clean workspace for compilation steps"]);
   } catch (e) {
     // If no changes to commit, ignore
   }
@@ -2302,8 +2300,13 @@ function executeCommits() {
       writeFile(relPath, c.files[relPath]);
     });
     
-    runGit("git add .");
-    runGit(`git commit -m "${c.message.replace(/"/g, '\\"')}"`);
+    // Check if we need to force add .env
+    if (c.files[".env"]) {
+      runGit(["add", "-f", ".env"]);
+    }
+    
+    runGit(["add", "."]);
+    runGit(["commit", "-m", c.message]);
   });
   
   // 4. Restore original final complete project files
@@ -2332,8 +2335,8 @@ function executeCommits() {
   fs.rmSync(backupDir, { recursive: true, force: true });
   
   // Final commit to restore all full details
-  runGit("git add .");
-  runGit("git commit -m 'feat(compiler): restore final fully-featured production-ready application'");
+  runGit(["add", "-A"]);
+  runGit(["commit", "-m", "feat(compiler): restore final fully-featured production-ready application"]);
   
   console.log("All commits generated and files restored successfully!");
 }

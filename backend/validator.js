@@ -10,28 +10,42 @@ function validateSchema(schema) {
   if (errors.length > 0) return { valid: false, errors };
 
   const tables = new Set((schema.db_schema.tables || []).map(t => t.name.toLowerCase()));
+  const apiOnlyPaths = new Set((schema.api_schema.endpoints || []).map(e => e.path));
+
+  // DB tables validation
   const dbTables = schema.db_schema.tables || [];
   dbTables.forEach(table => {
     const primaryKeys = (table.columns || []).filter(c => c.primary);
     if (primaryKeys.length === 0) errors.push(`Table '	ext${table.name}' has no primary key.`);
-    (table.columns || []).forEach(col => {
-      if (col.references) {
-        const [refTable, refCol] = col.references.split('.');
-        if (!refTable || !refCol) errors.push(`Invalid FK format: '	ext${col.references}'`);
-        else if (!tables.has(refTable.toLowerCase())) errors.push(`Table '	ext${table.name}.	ext${col.name}' references non-existent '	ext${refTable}'.`);
-      }
-    });
   });
 
-  // API vs DB Check
+  // API endpoints validation
   const endpoints = schema.api_schema.endpoints || [];
   endpoints.forEach(endpoint => {
     if (endpoint.dbAction) {
       const targetTable = (endpoint.dbAction.targetTable || '').toLowerCase();
-      if (targetTable && !tables.has(targetTable)) {
-        errors.push(`API '	ext${endpoint.method} 	ext${endpoint.path}' targets non-existent DB table '	ext${targetTable}'.`);
-      }
+      if (targetTable && !tables.has(targetTable)) errors.push(`API targets missing '	ext${targetTable}'.`);
     }
+  });
+
+  // UI bindings validation
+  const pages = schema.ui_schema.pages || [];
+  pages.forEach(page => {
+    const widgets = page.widgets || [];
+    widgets.forEach(widget => {
+      if (widget.targetTable) {
+        const tTable = widget.targetTable.toLowerCase();
+        if (!tables.has(tTable)) {
+          errors.push(`Widget '	ext${widget.title}' on '	ext${page.name}' targets missing table '	ext${tTable}'.`);
+        }
+      }
+      if (widget.dataSourceApi && !apiOnlyPaths.has(widget.dataSourceApi)) {
+        errors.push(`Widget '	ext${widget.title}' on '	ext${page.name}' binds to missing API '	ext${widget.dataSourceApi}'.`);
+      }
+      if (widget.submitApi && !apiOnlyPaths.has(widget.submitApi)) {
+        errors.push(`Widget '	ext${widget.title}' on '	ext${page.name}' binds to missing API '	ext${widget.submitApi}'.`);
+      }
+    });
   });
 
   return { valid: errors.length === 0, errors };

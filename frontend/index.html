@@ -5,8 +5,20 @@
   <title>AI Software Compiler</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <h1>AI Software Compiler Dashboard</h1>
+<body class="dark-mode">
+  <header class="app-header">
+    <div class="logo">
+      <h1>BankVerse Compiler</h1>
+    </div>
+    <div class="header-settings">
+      <select id="provider-select">
+        <option value="groq" selected>Groq (Llama-3.3)</option>
+        <option value="gemini">Gemini API (Flash)</option>
+        <option value="openai">OpenAI (GPT-4o)</option>
+      </select>
+      <input type="password" id="api-key-input" placeholder="API Key Override">
+    </div>
+  </header>
   <script src="runtime.js"></script>
 </body>
 </html>

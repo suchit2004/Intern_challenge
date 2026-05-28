@@ -8,9 +8,9 @@ async function fetchWithRetry(url, options, maxRetries = 6) {
   while (attempt < maxRetries) {
     attempt++;
     
-    // Set up a 25-second request timeout using AbortController
+    // Set up a 120-second request timeout using AbortController
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
     
     const requestOptions = {
       ...options,
@@ -210,7 +210,7 @@ async function callLLM({ provider, apiKey, model, systemPrompt, userPrompt, json
   if (resolvedProvider === 'gemini') {
     const key = (apiKey || process.env.GEMINI_API_KEY || '').trim();
     if (!key) throw new Error("Gemini API Key not found. Please set GEMINI_API_KEY.");
-    const selectedModel = model || 'gemini-2.5-flash';
+    const selectedModel = model || 'gemini-flash-latest';
 
     const body = {
       contents: [

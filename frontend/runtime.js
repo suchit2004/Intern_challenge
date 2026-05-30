@@ -49,7 +49,7 @@ let isPremiumPaid = false;
 // Mock database initial dataset examples
 const MOCK_DATA_TEMPLATES = {
   users: [
-    { id: 1, name: "Suchit Jundare", email: "suchit@bankverse.com", role: "Admin" },
+    { id: 1, name: "Suchit Jundare", email: "suchit@appforge.com", role: "Admin" },
     { id: 2, name: "Alice Smith", email: "alice@demo.com", role: "Member" }
   ],
   contacts: [

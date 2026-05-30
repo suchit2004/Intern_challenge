@@ -1,4 +1,4 @@
-# ⚙️ BankVerse Compiler: Natural Language to Executable App Compiler
+# ⚙️ AppForge Compiler: Natural Language to Executable App Compiler
 
 A production-grade compiler pipeline that translates open-ended natural language requirements into a strictly structured, semantically validated, and fully executable 5-layer application schema, running live inside an interactive sandbox environment.
 

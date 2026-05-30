@@ -74,8 +74,12 @@ app.post('/api/evaluate', async (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`================================================================`);
-  console.log(`🚀 AI SOFTWARE COMPILER SERVER IS RUNNING AT: http://localhost:${PORT}`);
-  console.log(`================================================================`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`================================================================`);
+    console.log(`🚀 AI SOFTWARE COMPILER SERVER IS RUNNING AT: http://localhost:${PORT}`);
+    console.log(`================================================================`);
+  });
+}
+
+module.exports = app;

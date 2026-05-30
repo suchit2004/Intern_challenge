@@ -56,9 +56,13 @@ async function runEvaluator(clientConfig) {
   const report = { timestamp: new Date().toISOString(), provider, summary, results };
   
   // Write result to evaluation_report.json in the current directory
-  const reportPath = path.join(__dirname, 'evaluation_report.json');
-  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-  console.log(`\nReport successfully written to: ${reportPath}`);
+  try {
+    const reportPath = path.join(__dirname, 'evaluation_report.json');
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+    console.log(`\nReport successfully written to: ${reportPath}`);
+  } catch (e) {
+    console.warn(`\n⚠️ Warning: Could not write evaluation report file: ${e.message}`);
+  }
   
   return report;
 }
@@ -67,9 +71,10 @@ async function runEvaluator(clientConfig) {
 if (require.main === module) {
   require('dotenv').config({ override: true });
   
+  const provider = process.env.LLM_PROVIDER || (process.env.GEMINI_API_KEY ? 'gemini' : 'groq');
   const clientConfig = {
-    provider: process.env.LLM_PROVIDER || 'groq',
-    apiKey: process.env.GROQ_API_KEY || null,
+    provider: provider,
+    apiKey: (provider === 'gemini' ? process.env.GEMINI_API_KEY : process.env.GROQ_API_KEY) || null,
     model: null
   };
 
